@@ -1,17 +1,64 @@
-<?php require_once 'header.php'; ?>
+<?php
+session_start();
+include_once '../config/config.php';
 
-<div class="row">
-    <div class="col-md-12">
-        <h2>Welcome, <?php echo htmlspecialchars($user['username']); ?>!</h2>
-        <p>This is the admin dashboard. From here, you can manage all aspects of the school.</p>
-        <div class="list-group">
-            <a href="users.php" class="list-group-item list-group-item-action">Manage Users</a>
-            <a href="classes.php" class="list-group-item list-group-item-action">Manage Classes</a>
-            <a href="subjects.php" class="list-group-item list-group-item-action">Manage Subjects</a>
-            <a href="students.php" class="list-group-item list-group-item-action">Manage Students</a>
-            <a href="parents.php" class="list-group-item list-group-item-action">Manage Parents</a>
-        </div>
+if (isset($_SESSION['admin_id'])) {
+    header('Location: dashboard.php');
+    exit();
+}
+
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+
+    $sql = "SELECT id, password FROM admins WHERE username = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $stmt->store_result();
+
+    if ($stmt->num_rows > 0) {
+        $stmt->bind_result($id, $hashed_password);
+        $stmt->fetch();
+        if (password_verify($password, $hashed_password)) {
+            $_SESSION['admin_id'] = $id;
+            header('Location: dashboard.php');
+            exit();
+        } else {
+            $error = 'Invalid password.';
+        }
+    } else {
+        $error = 'No user found with that username.';
+    }
+    $stmt->close();
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="login-container">
+        <form method="POST" action="">
+            <h2>Admin Login</h2>
+            <?php if ($error): ?>
+                <p class="error"><?php echo $error; ?></p>
+            <?php endif; ?>
+            <div class="input-group">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" required>
+            </div>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
     </div>
-</div>
-
-<?php require_once 'footer.php'; ?>
+</body>
+</html>

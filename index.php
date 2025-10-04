@@ -1,54 +1,36 @@
-<?php
-// Check if the configuration file exists
-if (!file_exists('config.php')) {
-    // Redirect to the installation page
-    header('Location: install.php');
-    exit;
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management System</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <img src="assets/images/logo.png" alt="School Logo">
+            <h1>School Name</h1>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="admin/">Admin</a></li>
+                <li><a href="teacher/">Teacher</a></li>
+                <li><a href="parent/">Parent</a></li>
+                <li><a href="student/">Student</a></li>
+            </ul>
+        </nav>
+    </header>
 
-// Include the configuration file
-require_once 'config.php';
+    <main>
+        <section class="hero">
+            <h2>Welcome to the Student Management System</h2>
+            <p>A complete solution for managing your school's data.</p>
+        </section>
+    </main>
 
-// Connect to the database
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-
-// Check for a successful connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// Check if the user is logged in
-session_start();
-if (!isset($_SESSION['user_id'])) {
-    // Redirect to the login page
-    header('Location: login.php');
-    exit;
-}
-
-// Get the user's role
-$user_id = $_SESSION['user_id'];
-$sql = "SELECT role FROM users WHERE id = $user_id";
-$result = $conn->query($sql);
-$row = $result->fetch_assoc();
-$role = $row['role'];
-
-// Redirect based on the user's role
-switch ($role) {
-    case 'admin':
-        header('Location: admin/index.php');
-        break;
-    case 'teacher':
-        header('Location: teacher/index.php');
-        break;
-    case 'student':
-        header('Location: student/index.php');
-        break;
-    case 'parent':
-        header('Location: parent/index.php');
-        break;
-    default:
-        // Redirect to the login page if the role is not recognized
-        header('Location: login.php');
-        break;
-}
-?>
+    <footer>
+        <p>&copy; 2024 School Name. All Rights Reserved.</p>
+    </footer>
+</body>
+</html>

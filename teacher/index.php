@@ -1,33 +1,64 @@
 <?php
-require_once 'header.php';
+session_start();
+include_once '../config/config.php';
 
-// Fetch the classes assigned to this teacher
-$sql_classes = "SELECT id, name FROM classes WHERE teacher_id = ? ORDER BY name";
-$stmt_classes = $conn->prepare($sql_classes);
-$stmt_classes->bind_param("i", $user_id);
-$stmt_classes->execute();
-$classes_result = $stmt_classes->get_result();
+if (isset($_SESSION['teacher_id'])) {
+    header('Location: dashboard.php');
+    exit();
+}
+
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $username = $_POST['username'];
+    $password = $_POST['password'];
+
+    $sql = "SELECT id, password FROM teachers WHERE username = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $stmt->store_result();
+
+    if ($stmt->num_rows > 0) {
+        $stmt->bind_result($id, $hashed_password);
+        $stmt->fetch();
+        if (password_verify($password, $hashed_password)) {
+            $_SESSION['teacher_id'] = $id;
+            header('Location: dashboard.php');
+            exit();
+        } else {
+            $error = 'Invalid password.';
+        }
+    } else {
+        $error = 'No user found with that username.';
+    }
+    $stmt->close();
+}
 ?>
-
-<h2>Your Dashboard</h2>
-<p>Here are the classes you are assigned to. Select a class to manage attendance or grades.</p>
-
-<?php if ($classes_result->num_rows > 0): ?>
-    <div class="list-group">
-        <?php while ($class = $classes_result->fetch_assoc()): ?>
-            <div class="list-group-item list-group-item-action flex-column align-items-start">
-                <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1"><?php echo htmlspecialchars($class['name']); ?></h5>
-                    <small>Class ID: <?php echo $class['id']; ?></small>
-                </div>
-                <p class="mb-1">Use the links below to manage this class.</p>
-                <a href="attendance.php?class_id=<?php echo $class['id']; ?>" class="btn btn-info btn-sm">Manage Attendance</a>
-                <a href="grades.php?class_id=<?php echo $class['id']; ?>" class="btn btn-secondary btn-sm">Manage Grades</a>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Login</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+    <div class="login-container">
+        <form method="POST" action="">
+            <h2>Teacher Login</h2>
+            <?php if ($error): ?>
+                <p class="error"><?php echo $error; ?></p>
+            <?php endif; ?>
+            <div class="input-group">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" required>
             </div>
-        <?php endwhile; ?>
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
     </div>
-<?php else: ?>
-    <div class="alert alert-info">You are not currently assigned to any classes.</div>
-<?php endif; ?>
-
-<?php require_once 'footer.php'; ?>
+</body>
+</html>
