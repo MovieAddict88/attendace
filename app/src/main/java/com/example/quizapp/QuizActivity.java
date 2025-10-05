@@ -3,9 +3,11 @@ package com.example.quizapp;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
@@ -13,6 +15,14 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,6 +38,7 @@ public class QuizActivity extends AppCompatActivity {
     private RadioButton rb3;
     private RadioButton rb4;
     private Button buttonConfirmNext;
+    private ProgressBar progressBar;
 
     private ColorStateList textColorDefaultRb;
 
@@ -38,6 +49,11 @@ public class QuizActivity extends AppCompatActivity {
 
     private int score;
     private boolean answered;
+
+    private int categoryId;
+    private String categoryName;
+    // NOTE: Replace with your actual server URL
+    private static final String API_URL = "http://10.0.2.2/quiz_app/api/get_questions.php?category_id=";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,46 +70,95 @@ public class QuizActivity extends AppCompatActivity {
         rb3 = findViewById(R.id.radio_button3);
         rb4 = findViewById(R.id.radio_button4);
         buttonConfirmNext = findViewById(R.id.button_confirm_next);
+        progressBar = findViewById(R.id.progress_bar_quiz);
 
         textColorDefaultRb = rb1.getTextColors();
 
-        String categoryName = getIntent().getStringExtra("categoryName");
+        categoryId = getIntent().getIntExtra("categoryId", 0);
+        categoryName = getIntent().getStringExtra("categoryName");
         textViewCategory.setText("Category: " + categoryName);
 
-        fillQuestionsList(categoryName);
+        questionList = new ArrayList<>();
 
-        questionCountTotal = questionList.size();
-        Collections.shuffle(questionList);
+        new FetchQuestionsTask().execute(categoryId);
 
-        showNextQuestion();
-
-        buttonConfirmNext.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (!answered) {
-                    if (rb1.isChecked() || rb2.isChecked() || rb3.isChecked() || rb4.isChecked()) {
-                        checkAnswer();
-                    } else {
-                        Toast.makeText(QuizActivity.this, "Please select an answer", Toast.LENGTH_SHORT).show();
-                    }
+        buttonConfirmNext.setOnClickListener(v -> {
+            if (!answered) {
+                if (rb1.isChecked() || rb2.isChecked() || rb3.isChecked() || rb4.isChecked()) {
+                    checkAnswer();
                 } else {
-                    showNextQuestion();
+                    Toast.makeText(QuizActivity.this, "Please select an answer", Toast.LENGTH_SHORT).show();
                 }
+            } else {
+                showNextQuestion();
             }
         });
     }
 
-    private void fillQuestionsList(String categoryName) {
-        questionList = new ArrayList<>();
-        if (categoryName.equals("Science")) {
-            questionList.add(new Question("What is the chemical symbol for water?", "O2", "H2O", "CO2", "NaCl", 2));
-            questionList.add(new Question("Which planet is known as the Red Planet?", "Earth", "Mars", "Jupiter", "Venus", 2));
-        } else if (categoryName.equals("History")) {
-            questionList.add(new Question("Who was the first president of the United States?", "Abraham Lincoln", "George Washington", "Thomas Jefferson", "John Adams", 2));
-            questionList.add(new Question("In which year did World War II end?", "1942", "1945", "1950", "1939", 2));
-        } else { // Math
-            questionList.add(new Question("What is 2 + 2?", "3", "4", "5", "6", 2));
-            questionList.add(new Question("What is 10 * 5?", "45", "50", "55", "60", 2));
+    private class FetchQuestionsTask extends AsyncTask<Integer, Void, String> {
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            progressBar.setVisibility(View.VISIBLE);
+        }
+
+        @Override
+        protected String doInBackground(Integer... params) {
+            int categoryId = params[0];
+            try {
+                URL url = new URL(API_URL + categoryId);
+                HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+                try {
+                    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
+                    StringBuilder stringBuilder = new StringBuilder();
+                    String line;
+                    while ((line = bufferedReader.readLine()) != null) {
+                        stringBuilder.append(line).append("\n");
+                    }
+                    bufferedReader.close();
+                    return stringBuilder.toString();
+                } finally {
+                    urlConnection.disconnect();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(String response) {
+            super.onPostExecute(response);
+            progressBar.setVisibility(View.GONE);
+            if (response != null) {
+                try {
+                    JSONArray jsonArray = new JSONArray(response);
+                    for (int i = 0; i < jsonArray.length(); i++) {
+                        JSONObject jsonObject = jsonArray.getJSONObject(i);
+                        questionList.add(new Question(
+                                jsonObject.getString("question"),
+                                jsonObject.getString("option1"),
+                                jsonObject.getString("option2"),
+                                jsonObject.getString("option3"),
+                                jsonObject.getString("option4"),
+                                jsonObject.getInt("answerNr")
+                        ));
+                    }
+                    questionCountTotal = questionList.size();
+                    if (questionCountTotal > 0) {
+                        Collections.shuffle(questionList);
+                        showNextQuestion();
+                    } else {
+                        Toast.makeText(QuizActivity.this, "No questions found for this category.", Toast.LENGTH_LONG).show();
+                        finish();
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    Toast.makeText(QuizActivity.this, "Failed to parse questions.", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(QuizActivity.this, "Failed to fetch questions.", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
